@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import LinkedInProvider from "next-auth/providers/linkedin";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
 const secureCookieOptions = {
@@ -13,6 +14,40 @@ const secureCookieOptions = {
   path: "/",
   maxAge: 30 * 24 * 60 * 60,
 };
+
+async function authorizeUser(email: string, password: string) {
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+  if (!user || !user.hashedPassword) return null;
+
+  if (user.lockedUntil && user.lockedUntil > new Date()) return null;
+
+  const isValid = await bcrypt.compare(password, user.hashedPassword);
+  if (!isValid) {
+    const attempts = user.failedSignInAttempts + 1;
+    const updates: Record<string, unknown> = { failedSignInAttempts: attempts };
+    if (attempts >= 5) {
+      updates.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+      updates.failedSignInAttempts = 0;
+    }
+    await prisma.user.update({ where: { id: user.id }, data: updates });
+    return null;
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastSignIn: new Date(), failedSignInAttempts: 0, lockedUntil: null },
+  });
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    image: user.image,
+    role: user.role || "user",
+  };
+}
 
 const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -47,17 +82,7 @@ const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        });
-        if (!user) return null;
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-          role: user.role || "user",
-        };
+        return authorizeUser(credentials.email, credentials.password);
       },
     }),
   ],

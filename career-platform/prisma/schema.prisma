@@ -17,6 +17,7 @@ model User {
   role          UserRole  @default(USER)
 
   // Security
+  hashedPassword String?
   lastSignIn    DateTime?
   failedSignInAttempts Int @default(0)
   lockedUntil   DateTime?
@@ -538,4 +539,34 @@ enum ServiceType {
   ONE_TIME
   CREDIT_BASED
   USAGE_BASED
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Action details
+  action      String   // login, logout, create, update, delete, export, etc
+  resource    String   // resume, job, user, etc
+  resourceId  String?
+
+  // Request details
+  ipAddress   String?
+  userAgent   String?
+  method      String?  // HTTP method
+  path        String?  // API path
+
+  // Metadata
+  metadata    Json?    // additional context
+  success     Boolean  @default(true)
+  error       String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

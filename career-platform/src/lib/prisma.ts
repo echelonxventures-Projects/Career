@@ -1,6 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool, PoolConfig } from "pg";
+import { getEnv } from "@/lib/env";
+
+const env = getEnv();
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -8,13 +11,13 @@ const globalForPrisma = globalThis as unknown as {
 
 // Connection pool configuration
 const poolConfig: PoolConfig = {
-  connectionString: process.env.DATABASE_URL,
+  connectionString: env.DATABASE_URL,
   // Production settings
-  max: parseInt(process.env.DATABASE_MAX_CONNECTIONS || "20", 10),
+  max: env.DATABASE_MAX_CONNECTIONS,
   idleTimeoutMillis: parseInt(process.env.DATABASE_IDLE_TIMEOUT || "30000", 10),
   connectionTimeoutMillis: parseInt(process.env.DATABASE_TIMEOUT || "5000", 10),
   // SSL for production
-  ssl: process.env.NODE_ENV === "production" && process.env.DATABASE_SSL !== "false"
+  ssl: env.NODE_ENV === "production" && process.env.DATABASE_SSL !== "false"
     ? { rejectUnauthorized: false }
     : undefined,
 };

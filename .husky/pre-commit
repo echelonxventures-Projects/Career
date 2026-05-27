@@ -1,0 +1,2 @@
+cd career-platform
+npx lint-staged

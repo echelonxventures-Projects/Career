@@ -4,6 +4,7 @@ out/
 build/
 coverage/
 .env*
+!.env.example
 !.env.production.template
 .vercel
 *.tsbuildinfo
@@ -13,3 +14,4 @@ next-env.d.ts
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.husky/_
