@@ -1,0 +1,541 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  role          UserRole  @default(USER)
+
+  // Security
+  lastSignIn    DateTime?
+  failedSignInAttempts Int @default(0)
+  lockedUntil   DateTime?
+  passwordChangedAt DateTime?
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret String?
+
+  // Profile
+  profile       UserProfile?
+
+  // Auth
+  accounts      Account[]
+  sessions      Session[]
+
+  // Content
+  resumes       Resume[]
+  cvs           CV[]
+  coverLetters  CoverLetter[]
+
+  // Job Search
+  jobApplications JobApplication[]
+  savedJobs     SavedJob[]
+
+  // Billing
+  subscriptions Subscription[]
+  payments      Payment[]
+  invoices      Invoice[]
+  usageRecords  UsageRecord[]
+
+  // LinkedIn
+  linkedInProfile LinkedInProfile?
+
+  // ATS Checks
+  atsChecks     ATSCheck[]
+
+  // Audit Logs
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  headline    String?
+  summary     String?
+  location    String?
+  phone       String?
+  website     String?
+  linkedInUrl String?
+
+  // Professional
+  currentTitle     String?
+  currentCompany   String?
+  yearsExperience  Int?
+  industry         String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("user_profiles")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+enum UserRole {
+  USER
+  PREMIUM
+  PRO
+  ADMIN
+}
+
+model Resume {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  isDefault   Boolean  @default(false)
+  template    String   @default("modern")
+
+  // Content
+  personalInfo    Json?
+  experience      Json?
+  education       Json?
+  skills          Json?
+  projects        Json?
+  certifications  Json?
+  languages       Json?
+  awards          Json?
+
+  // ATS Score
+  atsScore    Int?
+  atsFeedback Json?
+
+  // Metadata
+  downloads   Int      @default(0)
+  views       Int      @default(0)
+  isPublic    Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("resumes")
+}
+
+model CV {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  isDefault   Boolean  @default(false)
+  template    String   @default("academic")
+
+  // Academic Content
+  personalInfo    Json?
+  education       Json?
+  research        Json?
+  publications    Json?
+  presentations   Json?
+  grants          Json?
+  teaching        Json?
+  awards          Json?
+  professionalMemberships Json?
+  references      Json?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("cvs")
+}
+
+model CoverLetter {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  jobTitle    String?
+  company     String?
+
+  // Content
+  recipient   Json?    // name, title, company, address
+  body        String   // main content
+  signature   String?
+
+  // AI Generated
+  isAiGenerated Boolean @default(false)
+  aiPrompt      String?
+
+  // Template
+  template    String   @default("professional")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("cover_letters")
+}
+
+model Job {
+  id          String   @id @default(cuid())
+
+  // Job Details
+  title       String
+  company     String
+  companyLogo String?
+  location    String?
+  remote      Boolean  @default(false)
+  salary      Json?    // {min, max, currency, period}
+  jobType     JobType  @default(FULL_TIME)
+
+  // Description
+  description String   @db.Text
+  requirements String[]
+  responsibilities String[]
+  benefits    String[]
+
+  // Source
+  source      String   // linkedin, indeed, etc
+  sourceUrl   String?
+  externalId  String?
+
+  // Metadata
+  postedAt    DateTime @default(now())
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+
+  // Relations
+  applications JobApplication[]
+  savedJobs    SavedJob[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("jobs")
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  FREELANCE
+  TEMPORARY
+}
+
+model JobApplication {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  resumeId    String?
+  coverLetterId String?
+
+  status      ApplicationStatus @default(APPLIED)
+  appliedAt   DateTime @default(now())
+  notes       String?
+
+  // Timeline
+  stages      ApplicationStage[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, jobId])
+  @@map("job_applications")
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SCREENING
+  INTERVIEW
+  TECHNICAL
+  OFFER
+  REJECTED
+  WITHDRAWN
+  HIRED
+}
+
+model ApplicationStage {
+  id          String   @id @default(cuid())
+  applicationId String
+  application JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  stage       String
+  status      String
+  date        DateTime
+  notes       String?
+
+  createdAt   DateTime @default(now())
+
+  @@map("application_stages")
+}
+
+model SavedJob {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, jobId])
+  @@map("saved_jobs")
+}
+
+model ATSCheck {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  resumeId    String?
+  jobDescription String  @db.Text
+
+  // Results
+  overallScore    Int
+  sectionScores   Json  // {keywords: 85, formatting: 90, content: 75}
+  keywordMatches  Json  // matched and missing keywords
+  suggestions     String[]
+  improvements    Json?   // specific improvements needed
+
+  createdAt   DateTime @default(now())
+
+  @@map("ats_checks")
+}
+
+model Subscription {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripeSubscriptionId String @unique
+  stripeCustomerId     String
+
+  status      SubscriptionStatus @default(INCOMPLETE)
+  plan        SubscriptionPlan
+
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  PAUSED
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PREMIUM
+  PRO
+  ENTERPRISE
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripePaymentIntentId String?
+  amount      Int      // in cents
+  currency    String   @default("usd")
+  status      PaymentStatus
+  type        PaymentType
+
+  description String?
+  metadata    Json?
+
+  createdAt   DateTime @default(now())
+
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  REFUNDED
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  ONE_TIME
+  USAGE_BASED
+  CREDIT_PACK
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripeInvoiceId String?
+  invoiceNumber   String @unique
+
+  amount      Int
+  currency    String   @default("usd")
+  status      InvoiceStatus
+
+  periodStart DateTime
+  periodEnd   DateTime
+  paidAt      DateTime?
+  pdfUrl      String?
+
+  items       InvoiceItem[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  UNCOLLECTIBLE
+  VOID
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  description String
+  amount      Int
+  quantity    Int      @default(1)
+
+  createdAt   DateTime @default(now())
+
+  @@map("invoice_items")
+}
+
+model UsageRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        String   // resume_download, ats_check, cover_letter, etc
+  quantity    Int      @default(1)
+  cost        Int?     // in cents if applicable
+
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@map("usage_records")
+}
+
+model LinkedInProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // OAuth
+  linkedInId  String   @unique
+  accessToken String?
+  tokenExpiresAt DateTime?
+
+  // Profile Data
+  profileUrl  String?
+  headline    String?
+  summary     String?
+  industry    String?
+  location    String?
+
+  // Stats
+  connections Int?
+  followers   Int?
+
+  // Sync
+  lastSyncedAt DateTime?
+  syncStatus  String   @default("pending")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("linkedin_profiles")
+}
+
+model Service {
+  id          String   @id @default(cuid())
+
+  name        String
+  slug        String   @unique
+  description String
+  icon        String?
+
+  // Pricing
+  type        ServiceType
+  basePrice   Int?     // in cents for one-time
+  monthlyPrice Int?   // for subscriptions
+  creditsCost  Int?    // for credit-based
+
+  // Features
+  features    String[]
+  limitations Json?
+
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("services")
+}
+
+enum ServiceType {
+  FREE
+  SUBSCRIPTION
+  ONE_TIME
+  CREDIT_BASED
+  USAGE_BASED
+}
